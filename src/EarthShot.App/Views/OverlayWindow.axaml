@@ -14,6 +14,7 @@
         Background="#66000000"
         TransparencyLevelHint="Transparent">
     <Grid>
+        <Image Name="Backdrop" Stretch="Fill"></Image>
         <StackPanel HorizontalAlignment="Center"
                     VerticalAlignment="Top"
                     IsHitTestVisible="False"
@@ -39,7 +40,7 @@
                        IsVisible="False"
                        Stroke="#FD00FFD5"
                        StrokeThickness="2"
-                       Fill="#00000000">
+                       Fill="#66000000">
             </Rectangle>
         </Canvas>
     </Grid>

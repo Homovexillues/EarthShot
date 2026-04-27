@@ -3,8 +3,12 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using EarthShot.Core.Capturing;
-using EarthShot.Core.Capturing.Windows;
+using AvaloniaPixelFormat = Avalonia.Platform.PixelFormat;
+using CorePixelFormat = EarthShot.Core.Capturing.PixelFormat;
+using PixelRect = EarthShot.Core.Capturing.PixelRect;
 
 namespace EarthShot.App.Views;
 
@@ -12,16 +16,26 @@ public partial class OverlayWindow : Window
 {
     private readonly Rectangle _selectionBox;
     private readonly TextBlock _cursorLabel;
-    private readonly IScreenCapturer _capturer = new GdiScreenCapturer();
+    private readonly Image _backdrop;
+    private readonly CapturedImage _snapshot;
+
     private SelectionState _state = SelectionState.Idle;
     private Point _start;
     private Point _current;
 
+    // 仅供 Avalonia XAML loader / 设计器使用，运行时一律走带快照的构造器
     public OverlayWindow()
+        : this(default) { }
+
+    public OverlayWindow(CapturedImage snapshot)
     {
         InitializeComponent();
         _selectionBox = this.FindControl<Rectangle>("SelectionBox")!;
         _cursorLabel = this.FindControl<TextBlock>("CursorLabel")!;
+        _backdrop = this.FindControl<Image>("Backdrop")!;
+        _snapshot = snapshot;
+        if (!_snapshot.IsEmpty)
+            _backdrop.Source = ToBitmap(_snapshot);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -83,17 +97,18 @@ public partial class OverlayWindow : Window
 
         var rect = Normalize(_start, _current);
         var scaling = this.RenderScaling;
-        var physicalRect = new EarthShot.Core.Capturing.PixelRect(
+        var physicalRect = new PixelRect(
             (int)(rect.X * scaling),
             (int)(rect.Y * scaling),
             (int)(rect.Width * scaling),
             (int)(rect.Height * scaling)
         );
-        var image = _capturer.Capture(physicalRect);
+        // 不再调 GDI——直接从快照内存裁剪
+        var image = _snapshot.Crop(physicalRect);
         _cursorLabel.Text =
-            $"Selected: {image.Width:F0} x {image.Height:F0} {image.Pixels.Length} bytes";
+            $"Selected: {image.Width} × {image.Height} {image.Pixels.Length} bytes";
         Console.WriteLine(
-            $"Selected: {image.Width:F0} x {image.Height:F0} {image.Pixels.Length} bytes"
+            $"Selected: {image.Width} × {image.Height} {image.Pixels.Length} bytes"
         );
     }
 
@@ -113,6 +128,34 @@ public partial class OverlayWindow : Window
         var w = Math.Abs(a.X - b.X);
         var h = Math.Abs(a.Y - b.Y);
         return new Rect(x, y, w, h);
+    }
+
+    /// <summary>
+    /// 把内存里的 BGRA 字节流包装成 Avalonia 可绘制的 WriteableBitmap。
+    /// 用 Stretch=Fill 时 dpi 字段不影响显示，填 96 即可。
+    /// </summary>
+    private static unsafe WriteableBitmap ToBitmap(CapturedImage image)
+    {
+        var size = new PixelSize(image.Width, image.Height);
+        var dpi = new Vector(96, 96);
+        var format =
+            image.Format == CorePixelFormat.Bgra8888
+                ? AvaloniaPixelFormat.Bgra8888
+                : AvaloniaPixelFormat.Rgba8888;
+
+        var wb = new WriteableBitmap(size, dpi, format, AlphaFormat.Opaque);
+
+        using var fb = wb.Lock();
+        var src = image.Pixels.Span;
+        // Avalonia 的 RowBytes 可能与我们的 Stride 不等（极少见但要防）——按行复制
+        var rowBytes = image.Width * 4;
+        for (int y = 0; y < image.Height; y++)
+        {
+            var srcRow = src.Slice(y * image.Stride, rowBytes);
+            var dstSpan = new Span<byte>((byte*)fb.Address + y * fb.RowBytes, rowBytes);
+            srcRow.CopyTo(dstSpan);
+        }
+        return wb;
     }
 }
 

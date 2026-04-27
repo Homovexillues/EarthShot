@@ -27,5 +27,45 @@ public readonly record struct CapturedImage(
     PixelFormat Format
 )
 {
+    /// <summary>
+    /// 从当前图像中裁剪出一个指定区域的子图像，并返回一个新的CapturedImage结构。
+    /// </summary>
+    /// <param name="rect">要裁剪的区域</param>
+    /// <returns>裁剪后的子图像</returns>
+    public CapturedImage Crop(PixelRect rect)
+    {
+        if (rect.IsEmpty)
+        {
+            return default;
+        }
+        // 范围限制
+        rect = new PixelRect(
+            Math.Clamp(rect.X, 0, Width - 1),
+            Math.Clamp(rect.Y, 0, Height - 1),
+            Math.Clamp(rect.Width, 0, Width - rect.X),
+            Math.Clamp(rect.Height, 0, Height - rect.Y)
+        );
+        int bytesPerPixel = 4;
+        // 裁剪后的目标图像的像素数据缓冲区
+        var destBytes = new byte[rect.Width * rect.Height * bytesPerPixel];
+        // 原图像的像素数据缓冲区
+        var sourceBytes = Pixels.Span;
+        for (int y = 0; y < rect.Height; y++)
+        {
+            var sourceOffset = (rect.Y + y) * Stride + rect.X * bytesPerPixel;
+            var destOffset = y * rect.Width * bytesPerPixel;
+            sourceBytes
+                .Slice(sourceOffset, rect.Width * bytesPerPixel)
+                .CopyTo(destBytes.AsSpan(destOffset));
+        }
+        return new CapturedImage(
+            destBytes,
+            rect.Width,
+            rect.Height,
+            rect.Width * bytesPerPixel,
+            Format
+        );
+    }
+
     public bool IsEmpty => Pixels.IsEmpty || Width == 0 || Height == 0;
 }

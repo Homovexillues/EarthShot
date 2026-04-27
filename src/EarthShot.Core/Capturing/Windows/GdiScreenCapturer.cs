@@ -153,6 +153,34 @@ public sealed class GdiScreenCapturer : IScreenCapturer
     private static extern bool DeleteDC([In] IntPtr hdc);
 
     /// <summary>
+    /// GetSystemMetrics函数检索系统范围内的各种系统指标和配置设置。
+    /// 通过传递不同的nIndex参数，可以获取屏幕的宽度、高度、工作区大小等信息，
+    /// 这些信息对于屏幕捕获和窗口管理等操作非常有用。
+    /// </summary>
+    /// <param name="nIndex">要检索的系统指标或配置设置的索引:
+    /// 1 = SM_CXSCREEN (屏幕宽度)
+    /// 2 = SM_CYSCREEN (屏幕高度)
+    /// 4 = SM_CYCAPTION (窗口标题栏的高度)
+    /// 5 = SM_CXBORDER (窗口边框的宽度)
+    /// 10 = SM_CXFULLSCREEN (全屏模式下的屏幕宽度)
+    /// 11 = SM_CYFULLSCREEN (全屏模式下的屏幕高度)
+    /// 78 = SM_CXWORKAREA (工作区宽度)
+    /// 79 = SM_CYWORKAREA (工作区高度)
+    /// </param>
+    /// <returns>返回指定系统指标或配置设置的值</returns>
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+
+    private const int SM_CXSCREEN = 0;
+    private const int SM_CYSCREEN = 1;
+
+    /// <summary>
+    /// 主屏幕的物理像素 bounds。多显示器场景留待 M7 处理。
+    /// </summary>
+    public PixelRect PrimaryScreenBounds =>
+        new(0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+
+    /// <summary>
     /// DIB_Color_Mode枚举定义了GetDIBits函数中颜色模式的参数。
     /// DIB_RGB_COLORS表示使用RGB颜色，DIB_PAL_COLORS表示使用调色板索引颜色。
     /// </summary>
