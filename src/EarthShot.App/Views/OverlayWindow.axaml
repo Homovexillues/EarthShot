@@ -1,0 +1,37 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        x:Class="EarthShot.App.Views.OverlayWindow"
+        Title="EarthShot Overlay"
+        WindowDecorations="None"
+        Topmost="True"
+        ShowInTaskbar="False"
+        CanResize="False"
+        WindowStartupLocation="Manual"
+        WindowState="FullScreen"
+        Background="#66000000"
+        TransparencyLevelHint="Transparent">
+    <Grid>
+        <StackPanel HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="12">
+            <TextBlock Text="EarthShot"
+                       Foreground="#FFFFFFFF"
+                       FontSize="48"
+                       FontWeight="Light"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="M1 骨架验证 · 按 Esc 退出"
+                       Foreground="#CCFFFFFF"
+                       FontSize="16"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Name="CursorLabel"
+                       Text="Cursor: -"
+                       Foreground="#99FFFFFF"
+                       FontSize="14"
+                       HorizontalAlignment="Center"
+                       Margin="0,24,0,0"/>
+        </StackPanel>
+    </Grid>
+</Window>

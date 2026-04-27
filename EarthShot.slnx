@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/EarthShot.App/EarthShot.App.csproj" />
+    <Project Path="src/EarthShot.Core/EarthShot.Core.csproj" />
+  </Folder>
+</Solution>
