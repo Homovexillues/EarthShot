@@ -7,4 +7,8 @@
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Folder Include="Capturing\Windows\" />
+  </ItemGroup>
+
 </Project>

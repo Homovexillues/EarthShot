@@ -3,6 +3,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
+using EarthShot.Core.Capturing;
+using EarthShot.Core.Capturing.Windows;
 
 namespace EarthShot.App.Views;
 
@@ -10,7 +12,7 @@ public partial class OverlayWindow : Window
 {
     private readonly Rectangle _selectionBox;
     private readonly TextBlock _cursorLabel;
-
+    private readonly IScreenCapturer _capturer = new GdiScreenCapturer();
     private SelectionState _state = SelectionState.Idle;
     private Point _start;
     private Point _current;
@@ -80,8 +82,19 @@ public partial class OverlayWindow : Window
         UpdateSelectionBox();
 
         var rect = Normalize(_start, _current);
+        var scaling = this.RenderScaling;
+        var physicalRect = new EarthShot.Core.Capturing.PixelRect(
+            (int)(rect.X * scaling),
+            (int)(rect.Y * scaling),
+            (int)(rect.Width * scaling),
+            (int)(rect.Height * scaling)
+        );
+        var image = _capturer.Capture(physicalRect);
         _cursorLabel.Text =
-            $"Selected: {rect.X:F0}, {rect.Y:F0}  {rect.Width:F0} × {rect.Height:F0}";
+            $"Selected: {image.Width:F0} x {image.Height:F0} {image.Pixels.Length} bytes";
+        Console.WriteLine(
+            $"Selected: {image.Width:F0} x {image.Height:F0} {image.Pixels.Length} bytes"
+        );
     }
 
     private void UpdateSelectionBox()
