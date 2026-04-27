@@ -15,23 +15,32 @@
         TransparencyLevelHint="Transparent">
     <Grid>
         <StackPanel HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
+                    VerticalAlignment="Top"
+                    IsHitTestVisible="False"
                     Spacing="12">
             <TextBlock Text="EarthShot"
                        Foreground="#FFFFFFFF"
-                       FontSize="48"
+                       FontSize="24"
                        FontWeight="Light"
                        HorizontalAlignment="Center"/>
             <TextBlock Text="M1 骨架验证 · 按 Esc 退出"
                        Foreground="#CCFFFFFF"
-                       FontSize="16"
+                       FontSize="8"
                        HorizontalAlignment="Center"/>
             <TextBlock Name="CursorLabel"
                        Text="Cursor: -"
                        Foreground="#99FFFFFF"
-                       FontSize="14"
+                       FontSize="8"
                        HorizontalAlignment="Center"
-                       Margin="0,24,0,0"/>
+                       Margin="0,8,0,0"/>
         </StackPanel>
+        <Canvas>
+            <Rectangle Name="SelectionBox"
+                       IsVisible="False"
+                       Stroke="#FD00FFD5"
+                       StrokeThickness="2"
+                       Fill="#00000000">
+            </Rectangle>
+        </Canvas>
     </Grid>
 </Window>
