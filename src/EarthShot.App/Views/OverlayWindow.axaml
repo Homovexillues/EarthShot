@@ -36,11 +36,16 @@
                        Margin="0,8,0,0"/>
         </StackPanel>
         <Canvas>
+            <!-- 4 个裙边遮罩，围绕 SelectionBox 形成"挖洞"效果 -->
+            <Rectangle Name="MaskTop"    Fill="#80000000"/>
+            <Rectangle Name="MaskBottom" Fill="#80000000"/>
+            <Rectangle Name="MaskLeft"   Fill="#80000000"/>
+            <Rectangle Name="MaskRight"  Fill="#80000000"/>
             <Rectangle Name="SelectionBox"
                        IsVisible="False"
                        Stroke="#FD00FFD5"
-                       StrokeThickness="2"
-                       Fill="#66000000">
+                       StrokeThickness="0.1"
+                       Fill="Transparent">
             </Rectangle>
         </Canvas>
     </Grid>
