@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
@@ -6,6 +8,7 @@ using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using EarthShot.Core.Capturing;
+using EarthShot.Core.Processing;
 using AvaloniaPixelFormat = Avalonia.Platform.PixelFormat;
 using CorePixelFormat = EarthShot.Core.Capturing.PixelFormat;
 using PixelRect = EarthShot.Core.Capturing.PixelRect;
@@ -19,6 +22,11 @@ public partial class OverlayWindow : Window
     /// 并根据用户拖动调整位置和大小。
     /// </summary>
     private readonly Rectangle _selectionBox;
+
+    /// <summary>
+    /// 二维码图像处理器
+    /// </summary>
+    private readonly IImageProcessor _processor = new QRCodeProcessor();
 
     /// <summary>
     /// 显示鼠标坐标和选区信息的文本控件，始终可见，实时更新内容。
@@ -138,7 +146,7 @@ public partial class OverlayWindow : Window
         }
     }
 
-    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    protected override async void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
         if (_state != SelectionState.Selecting)
@@ -156,16 +164,25 @@ public partial class OverlayWindow : Window
             (int)(rect.Width * scaling),
             (int)(rect.Height * scaling)
         );
-        // 不再调 GDI——直接从快照内存裁剪
+        // 不再调 GDI——直接从快照内存裁剪（同步、毫秒级）
         var image = _snapshot.Crop(physicalRect);
-        _cursorLabel.Text = $"Selected: {image.Width} x {image.Height} {image.Pixels.Length} bytes";
-        Console.WriteLine($"Selected: {image.Width} x {image.Height} {image.Pixels.Length} bytes");
-        var px = image.Pixels.Span;
-        if (!image.IsEmpty)
+        _cursorLabel.Text = $"Decoding... {image.Width} x {image.Height}";
+        //Console.WriteLine($"Selected: {image.Width} x {image.Height} {image.Pixels.Length} bytes");
+
+        // 解码扔到后台线程，避免 UI 卡顿。await 后默认回 UI 线程，可以直接操作控件。
+        var results = await Task.Run(() => _processor.Process(image).ToList());
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var r in results)
         {
-            int i = (image.Height / 2) * image.Stride + (image.Width / 2) * 4;
-            Console.WriteLine($"  center BGRA = {px[i]},{px[i + 1]},{px[i + 2]},{px[i + 3]}");
+            if (r is QrCodeResult qr)
+            {
+                sb.Append($"QR Code: {qr.Text}");
+            }
         }
+        var text = sb.Length == 0 ? "No QR code found" : sb.ToString();
+        _cursorLabel.Text = text;
+        Console.WriteLine(text);
     }
 
     /// <summary>
