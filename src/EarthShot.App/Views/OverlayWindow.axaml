@@ -24,7 +24,7 @@
                        FontSize="24"
                        FontWeight="Light"
                        HorizontalAlignment="Center"/>
-            <TextBlock Text="M1 骨架验证 · 按 Esc 退出"
+            <TextBlock Text="按 Esc 退出"
                        Foreground="#CCFFFFFF"
                        FontSize="8"
                        HorizontalAlignment="Center"/>
@@ -35,6 +35,20 @@
                        HorizontalAlignment="Center"
                        Margin="0,8,0,0"/>
         </StackPanel>
+        <Border Name="Toast"
+                IsVisible="False"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="#CC000000"
+                CornerRadius="8"
+                Padding="20,12"
+                IsHitTestVisible="False">
+            <TextBlock Name="ToastText"
+                       Foreground="White"
+                       FontSize="18"
+                       TextWrapping="Wrap"
+                       MaxWidth="600"/>
+        </Border>
         <Canvas>
             <!-- 4 个裙边遮罩，围绕 SelectionBox 形成"挖洞"效果 -->
             <Rectangle Name="MaskTop"    Fill="#80000000"/>

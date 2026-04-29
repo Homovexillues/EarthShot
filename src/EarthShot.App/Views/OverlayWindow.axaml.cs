@@ -1,5 +1,5 @@
 using System;
-using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -7,7 +7,9 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using EarthShot.App.Actions;
 using EarthShot.Core.Capturing;
+using EarthShot.Core.Pipeline;
 using EarthShot.Core.Processing;
 using AvaloniaPixelFormat = Avalonia.Platform.PixelFormat;
 using CorePixelFormat = EarthShot.Core.Capturing.PixelFormat;
@@ -24,9 +26,21 @@ public partial class OverlayWindow : Window
     private readonly Rectangle _selectionBox;
 
     /// <summary>
-    /// 二维码图像处理器
+    /// 负责处理用户选择的图像并返回结果的处理器实例。
     /// </summary>
-    private readonly IImageProcessor _processor = new QRCodeProcessor();
+    private readonly ScreenshotPipeline _screenshotPipeline;
+
+    /// <summary>
+    /// Toast 容器（控制显示/隐藏），里面是文字。
+    /// 显示性挂在 Border 上而不是 TextBlock 上——父级 IsVisible=False 时子级不会渲染。
+    /// </summary>
+    private readonly Border _toastBorder;
+    private readonly TextBlock _toastText;
+
+    /// <summary>
+    /// Toast 消息显示的持续时间。
+    /// </summary>
+    private readonly TimeSpan _toastDuration = TimeSpan.FromSeconds(2);
 
     /// <summary>
     /// 显示鼠标坐标和选区信息的文本控件，始终可见，实时更新内容。
@@ -52,11 +66,7 @@ public partial class OverlayWindow : Window
     private readonly CapturedImage _snapshot;
 
     /// <summary>
-    /// 用户选择区域的状态机：
-    /// Idle（未开始选择）
-    /// Selecting（正在选择）
-    /// Selected（已选择）
-    /// 注意 Selected 状态下用户还可以继续调整选区，直到按下 Esc 键或右键取消。
+    /// 用户选择区域的状态机。详见 SelectionState 枚举注释。
     /// </summary>
     private SelectionState _state = SelectionState.Idle;
 
@@ -77,14 +87,20 @@ public partial class OverlayWindow : Window
     public OverlayWindow(CapturedImage snapshot)
     {
         InitializeComponent();
-        _selectionBox = this.FindControl<Rectangle>("SelectionBox")!;
-        _cursorLabel = this.FindControl<TextBlock>("CursorLabel")!;
+        _snapshot = snapshot;
         _backdrop = this.FindControl<Image>("Backdrop")!;
+        _cursorLabel = this.FindControl<TextBlock>("CursorLabel")!;
         _maskTop = this.FindControl<Rectangle>("MaskTop")!;
         _maskBottom = this.FindControl<Rectangle>("MaskBottom")!;
         _maskLeft = this.FindControl<Rectangle>("MaskLeft")!;
         _maskRight = this.FindControl<Rectangle>("MaskRight")!;
-        _snapshot = snapshot;
+        _selectionBox = this.FindControl<Rectangle>("SelectionBox")!;
+        _toastBorder = this.FindControl<Border>("Toast")!;
+        _toastText = this.FindControl<TextBlock>("ToastText")!;
+        _screenshotPipeline = new ScreenshotPipeline(
+            [new QRCodeProcessor()],
+            [new ClipboardAction(() => TopLevel.GetTopLevel(this)?.Clipboard)]
+        );
         if (!_snapshot.IsEmpty)
             _backdrop.Source = ToBitmap(_snapshot);
     }
@@ -110,16 +126,18 @@ public partial class OverlayWindow : Window
     {
         base.OnPointerPressed(e);
         var props = e.GetCurrentPoint(this).Properties;
-
+        // 右键退出
         if (props.IsRightButtonPressed)
         {
             Close();
             return;
         }
-
+        // 左键没点退出
         if (!props.IsLeftButtonPressed)
             return;
-
+        // 有图正在处理退出
+        if (_state == SelectionState.Processing)
+            return;
         _start = e.GetPosition(this);
         _current = _start;
         _state = SelectionState.Selecting;
@@ -153,7 +171,7 @@ public partial class OverlayWindow : Window
             return;
 
         e.Pointer.Capture(null);
-        _state = SelectionState.Selected;
+        _state = SelectionState.Processing;
         UpdateSelectionBox();
 
         var rect = Normalize(_start, _current);
@@ -166,12 +184,10 @@ public partial class OverlayWindow : Window
         );
         // 不再调 GDI——直接从快照内存裁剪（同步、毫秒级）
         var image = _snapshot.Crop(physicalRect);
-        _cursorLabel.Text = $"Decoding... {image.Width} x {image.Height}";
-        //Console.WriteLine($"Selected: {image.Width} x {image.Height} {image.Pixels.Length} bytes");
-
-        // 解码扔到后台线程，避免 UI 卡顿。await 后默认回 UI 线程，可以直接操作控件。
-        var results = await Task.Run(() => _processor.Process(image).ToList());
-
+        // 不要外层包 Task.Run——Pipeline 自己会把 CPU 工作分到后台线程，
+        // action 留在 UI 线程跑，这样 ClipboardAction 才能合法访问 this.Clipboard
+        var results = await _screenshotPipeline.RunAsync(image);
+        Console.WriteLine($"[release] pipeline returned {results.Count} results");
         var sb = new System.Text.StringBuilder();
         foreach (var r in results)
         {
@@ -181,8 +197,50 @@ public partial class OverlayWindow : Window
             }
         }
         var text = sb.Length == 0 ? "No QR code found" : sb.ToString();
-        _cursorLabel.Text = text;
-        Console.WriteLine(text);
+        await ShowToastThenCloseAsync(text);
+    }
+
+    /// <summary>
+    /// 显示Toast消息，持续一段时间后自动关闭窗口。Toast是覆盖在界面上的临时消息提示，不会打断用户操作。
+    /// </summary>
+    /// <param name="text">要显示的消息文本</param>
+    /// <returns></returns>
+    private async Task ShowToastThenCloseAsync(string text)
+    {
+        _toastText.Text = text;
+        _toastBorder.IsVisible = true;
+        Topmost = true;
+        await Task.Delay(_toastDuration);
+        Close();
+    }
+
+    /// <summary>
+    /// Avalonia 写剪贴板走的是 OLE 路径（OleSetClipboard），数据是"延迟渲染"——
+    /// 实际字节由我们进程的 IDataObject 按需提供。一旦进程退出，IDataObject 析构，
+    /// 系统就把剪贴板清空了。
+    ///
+    /// OleFlushClipboard 让 OLE 立刻把数据序列化到全局内存，独立于我们的进程，
+    /// 这样关窗后用户 Ctrl+V 还能粘到。Windows 专属——别的平台这步不需要也无效。
+    /// </summary>
+    // LibraryImport 走 source generator，AOT 友好；返回 HRESULT 由调用方判断
+    [LibraryImport("ole32.dll")]
+    private static partial int OleFlushClipboard();
+
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        base.OnClosing(e);
+        if (!OperatingSystem.IsWindows())
+            return;
+        try
+        {
+            var hr = OleFlushClipboard();
+            if (hr != 0)
+                Console.Error.WriteLine($"[OleFlushClipboard] HRESULT 0x{hr:X8}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[OleFlushClipboard] {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -231,6 +289,14 @@ public partial class OverlayWindow : Window
         _maskRight.Height = Math.Max(0, b - y);
     }
 
+    /// <summary>
+    /// 将两个对角点坐标规范化成一个矩形（左上角坐标 + 宽高）。
+    /// 用户可能从任意方向拖动选区，所以要 Math.Min/Max 一下。
+    /// 坐标系都是设备无关像素（DIP），与鼠标事件一致，不需要考虑 DPI 缩放。
+    /// </summary>
+    /// <param name="a">第一个对角点</param>
+    /// <param name="b">第二个对角点</param>
+    /// <returns>规范化后的矩形</returns>
     private static Rect Normalize(Point a, Point b)
     {
         var x = Math.Min(a.X, b.X);
@@ -273,9 +339,17 @@ public partial class OverlayWindow : Window
     }
 }
 
+/// <summary>
+/// 用户选择区域的状态机：
+/// Idle（未开始选择）
+/// Selecting（正在拖拽选区）
+/// Processing（已松开，正在解码 + 显示 toast + 等待关窗——此状态下忽略新的左键，
+///             避免异步尾巴里的多个 ShowToastThenCloseAsync 互相覆盖文本/重复 Close）
+/// 任何状态下 Esc / 右键都会立即关窗。
+/// </summary>
 internal enum SelectionState
 {
     Idle,
     Selecting,
-    Selected,
+    Processing,
 }
