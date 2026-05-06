@@ -187,7 +187,6 @@ public partial class OverlayWindow : Window
         // 不要外层包 Task.Run——Pipeline 自己会把 CPU 工作分到后台线程，
         // action 留在 UI 线程跑，这样 ClipboardAction 才能合法访问 this.Clipboard
         var results = await _screenshotPipeline.RunAsync(image);
-        Console.WriteLine($"[release] pipeline returned {results.Count} results");
         var sb = new System.Text.StringBuilder();
         foreach (var r in results)
         {

@@ -11,7 +11,7 @@ public sealed class ClipboardAction(Func<IClipboard?> getClipboard) : IResultAct
 {
     public bool CanHandle(ProcessingResult result)
     {
-        return result is not null;
+        return result is QrCodeResult;
     }
 
     public async Task ExecuteAsync(
@@ -26,14 +26,11 @@ public sealed class ClipboardAction(Func<IClipboard?> getClipboard) : IResultAct
         var clipboard = getClipboard();
         if (clipboard is null)
         {
-            Console.WriteLine("[ClipboardAction] Clipboard is null — cannot set text!");
             return;
         }
-        Console.WriteLine($"[ClipboardAction] Setting clipboard text: {qrCodeResult.Text}");
         try
         {
             await clipboard.SetTextAsync(qrCodeResult.Text);
-            Console.WriteLine("[ClipboardAction] SetTextAsync completed");
         }
         catch (Exception ex)
         {
