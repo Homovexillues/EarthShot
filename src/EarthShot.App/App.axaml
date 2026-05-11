@@ -7,4 +7,19 @@
     <Application.Styles>
         <FluentTheme />
     </Application.Styles>
+    <Application.DataTemplates>
+            
+    </Application.DataTemplates>
+    <TrayIcon.Icons>
+        <TrayIcons>
+            <TrayIcon ToolTipText="EarthShot" Icon="Assets/icon.png">
+                <TrayIcon.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="截图" Click="OnTrayCapture"/>
+                        <NativeMenuItem Header="退出" Click="OnTrayExit"/>
+                    </NativeMenu>
+                </TrayIcon.Menu>
+            </TrayIcon>
+        </TrayIcons>
+    </TrayIcon.Icons>
 </Application>

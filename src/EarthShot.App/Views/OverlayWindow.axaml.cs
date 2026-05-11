@@ -208,7 +208,6 @@ public partial class OverlayWindow : Window
     {
         _toastText.Text = text;
         _toastBorder.IsVisible = true;
-        Topmost = true;
         await Task.Delay(_toastDuration);
         Close();
     }

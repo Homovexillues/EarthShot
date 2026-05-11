@@ -26,5 +26,10 @@
 
   <ItemGroup>
     <Folder Include="Actions\" />
+    <Folder Include="Assets\" />
+    <Folder Include="Services\" />
+  </ItemGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\*" />
   </ItemGroup>
 </Project>
